@@ -42,7 +42,7 @@ MySQL 8.0부터는 **SYSTEM_USER** 권한에따라 **System Account**와 **Regul
     - **Account lock**이 걸려 있어, 의도적으로 풀지 않는 이상 보안 이슈 발생 X
 
 | User             | host          |account_locked | 목적          |
-| ---------------- |:-------------:|:-------------:|:-------------:| 
+| ---------------- | ------------- | ------------- | ------------- | 
 | msysql.infoschema| localhost     |Y              |기본으로 내장된 sys 스키마의 객체들의 DEFINER로 사용
 | mysql.session    | localhost     |Y              |MySQL 플러그인이 서버로 접근할 때 사용
 | mysql.sys        | localhost     |Y              |information_schema에 정의된 뷰의 DEFINER로 사용
@@ -70,6 +70,7 @@ mysql > CREATE USER 'user'@'%'
         PASSWORD REQUIRE CURRENT DEFAULT;
 ```
 
+**Reference**: https://dev.mysql.com/doc/refman/8.0/en/create-user.html
 ### 3.2.2.1 IDENTIFIED WITH
 사용자의 인증 방식과 비밀번호를 설정
 
@@ -176,7 +177,40 @@ REQUIRE SSL AND X509;
     - ```ACCOUNT LOCK```: 계정 잠금
     - ```ACCOUNT UNLOCK```: 계정 잠금 해제
     
+    
 ## 3.3 비밀번호 관리
+
+### 3.3.1 고수준 비밀번호
+
+- 유효기간이나 이력 관리를 통한 재사용 금지
+- 글자의 조합을 강제, 금칙어 설정
+
+유효성 체크 규칙 적용을 위해 ```valicate_password```를 설치 / 사용
+```
+mysql> INSTALL COMPONET 'file://component_validate_password';
+mysql> SELECT * FROM mysql.component;
+
+```
+| component_id| component_group_id |component_urn                     |
+|-------------|--------------------|----------------------------------|
+|            1|                   1|file://component_validate_password|
+
+```validate_password```에서 제공하는 시스템 변수 확인
+```
+mysql> SHOW GLOBAL VARIABLES LIKE 'validate_password%';
+```
+|Variable_name                       |Value                    |목적|
+|------------------------------------|-------------------------|----|
+|   validate_password.check_user_name|             **ON** / OFF|
+|   validate_password.dictionary_file|                         |
+|            validate_password.length|          **8** [Integer]|
+|  validate_password.mixed_case_count|          **2** [Integer]|
+|      validate_password.number_count|          **2** [Integer]|
+|            validate_password.policy|LOW / **MEDIUM** / STRONG|
+|validate_password.special_char_count|          **2** [Integer]|
+
+**Reference**: https://dev.mysql.com/doc/refman/8.0/en/validate-password-options-variables.html
+
 
 ## 3.4 권한 (Privilege)
 
