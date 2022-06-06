@@ -199,19 +199,202 @@ mysql> SELECT * FROM mysql.component;
 ```
 mysql> SHOW GLOBAL VARIABLES LIKE 'validate_password%';
 ```
-|Variable_name                       |Value                    |목적|
-|------------------------------------|-------------------------|----|
-|   validate_password.check_user_name|             **ON** / OFF|
-|   validate_password.dictionary_file|                         |
-|            validate_password.length|          **8** [Integer]|
-|  validate_password.mixed_case_count|          **2** [Integer]|
-|      validate_password.number_count|          **2** [Integer]|
-|            validate_password.policy|LOW / **MEDIUM** / STRONG|
-|validate_password.special_char_count|          **2** [Integer]|
+|Variable_name                       |Value                    |                                             목적|
+|------------------------------------|-------------------------|-------------------------------------|
+|   validate_password.check_user_name|             **ON** / OFF|                          user name과 같은지 검사|
+|   validate_password.dictionary_file|       [금칙어 파일 경로]|                                      금칙어 파일|    
+|            validate_password.length|          **8** [Integer]|                               비밀번호 길이 검사|
+|  validate_password.mixed_case_count|          **2** [Integer]|         해당 값 이상의 대문자 & 소문자를 사용|
+|      validate_password.number_count|          **2** [Integer]|                       해당 값 이상의 숫자를 사용|
+|            validate_password.policy|LOW / **MEDIUM** / STRONG|                               비밀번호 검사 정책|
+|validate_password.special_char_count|          **2** [Integer]|                  해당 값 이상의 특수 문자를 사용|
 
 **Reference**: https://dev.mysql.com/doc/refman/8.0/en/validate-password-options-variables.html
 
+- 비밀번호 정책
+    - **LOW**: 비밀번호의 길이 검사
+    - **MEDIUM**: LOW 포함 / 숫자, 대소문자, 특수문자의 배합을 검사 
+    - **STRONG**: MEDIUM 포함 / 금칙어가 포함되었는지 여부 검사
+
+### 3.3.2 이중 비밀번호
+
+DB는 web application과 연결되어있어 계정정보 (비밀번호)를 변경하기는 어려움.
+
+비밀번호를 2개 사용함으로써 서비스를 멈추지 않으면서 비밀번호 변경 가능.
+
+#### ex. 3.3.1
+```
+// 비밀번호 변경
+mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'old_password';
+
+// 비밀번호를 변경하면서 기존 비밀번호를 secondary로 설정
+mysql> ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password' RETAIN CURRENT PASSWORD;;
+
+// Secondary 비밀번호 삭제
+mysql> ALTER USER 'root'@'localhost' DISCARD OLD PASSWORD;
+```
 
 ## 3.4 권한 (Privilege)
+- 글로벌 권한
+    - 데이터베이스나 테이블 이외의 객체에 적용되는 권한
+- 객체 권한
+    - 데이터베이스나 테이블에 적용되는 권한
+    - ```GRANT``` 명령어를 통해 권한을 부여할 때, 특정 객체를 명시
+- 동적 권한
+    - 컴포넌트나 플러그인의 설치에 따라 등록
+    - MySQL 8.0부터 지원
+
+권한 테이블은 **Appendix.A** 참고 
+
+#### 권한 부여
+
+권한 부여는 다음과 같은 명령어를 통해서 부여 가능하다.
+
+```
+mysql> GRANT [privilege list] ON [database].[table] TO [user]@[host];
+```
+
+- 사용자를 생성하지 않은 상태로 권한 부여를 하면 오류 발생
+- ```GRANT OPTION``` 권한은 ```GRANT [privilege list] ON [database].[table] TO [user]@[host] WITH GRANT OPTION```과 같이 실행
+- 권한 종류에 따라 ON에 범위가 달라짐
+
+#### ex. 3.4.1
+
+- 글로벌 권한은 특정 객체에 부여되지 않기 때문에 ON절에 *.*으로 기입
+    
+```
+mysql> GRANT SUPER ON *.* TO 'user'@'localhost';
+```
+
+#### ex. 3.4.2
+
+- DB 권한은 특정 DB에 대해서 권한을 부여하거나 서버에 존재하는 모든 DB에 권한 부여
+- ON절에 *.* 혹은 [database].*으로 기입
+
+```
+mysql> GRANT EVENT ON *.* 'user'@'localhost';
+mysql> GRANT EVENT ON employees.* 'user'@'localhost';
+```
+
+#### ex. 3.4.3
+
+- 테이블 권한은 권한 부여 범위에 따라 ON절에 *.* / [database].* / [database].[table]으로 기입
+
+```
+mysql> GRANT SELECT, INSERT, UPDATE, DELETE ON *.* 'user'@'localhost';
+mysql> GRANT SELECT, INSERT, UPDATE, DELETE ON employees.* 'user'@'localhost';
+mysql> GRANT SELECT, INSERT, UPDATE, DELETE ON employees.department 'user'@'localhost';
+```
+
+#### ex. 3.4.4
+
+- 테이블에 특정 칼럼에 대해서만 권한을 부여 가능
+- INSERT, UPDATE, SELECT 권한에 대해 동작
+
+```
+// INSERT는 dept_id에 대해서만 동작
+// UPDATE는 dept_name에 대해서만 동작
+// SELECT는 모든 컬럼에 대해 수행
+
+mysql> GRANT SELECT, INSERT(dept_id), UPDATE(dept_name) ON employees.department 'user'@'localhost'; 
+```
+
+컬럼 단위의 설정은 나머지 모든 컬럼에 대해서도 검사하여 성능에 영향
+
+VIEW를 만들어서 VIEW에 대한 권한으로 관리
 
 ## 3.5 역할 (Role)
+
+MySQL 8.0부터 권한을 묶어서 Role로 사용
+
+## Apendix
+
+### A. 권한 목록
+
+    
+#### 글로벌 권한
+**Reference**: https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html
+
+| Privilege                     | Grant Table Column           | Context                               |
+|-------------------------------|------------------------------|---------------------------------------|
+| ```ALL [PRIVILEGES]```        | Synonym for “all privileges” | Server administration                 |
+| ```ALTER```                   | Alter_priv                   | Tables                                |
+| ```CREATE ROLE```             | Create_role_priv             | Server administration                 |
+| ```CREATE TABLESPACE```       | Create_tablespace_priv       | Server administration                 |
+| ```CREATE USER```             | Create_user_priv             | Server administration                 |
+| ```DROP ROLE```               | Drop_role_priv               | Server administration                 |
+| ```FILE```                    | File_priv                    | File access on server host            |
+| ```PROCESS```                 | Process_priv                 | Server administration                 |
+| ```PROXY```                   | See proxies_priv table       | Server administration                 |
+| ```RELOAD```                  | Reload_priv                  | Server administration                 |
+| ```REPLICATION CLIENT```      | Repl_client_priv             | Server administration                 |
+| ```REPLICATION SLAVE```       | Repl_slave_priv              | Server administration                 |
+| ```SHOW DATABASES```          | Show_db_priv                 | Server administration                 |
+| ```SHUTDOWN```                | Shutdown_priv                | Server administration                 |
+| ```SUPER```                   | Super_priv                   | Server administration                 |
+| ```USAGE```                   | Synonym for “no privileges”  | Server administration                 |
+
+#### 객체 권한
+| Privilege                     | Grant Table Column           | Context                               |
+|-------------------------------|------------------------------|---------------------------------------|
+| ```ALL [PRIVILEGES]```        | Synonym for “all privileges” | Server administration                 |
+| ```ALTER```                   | Alter_priv                   | Tables                                |
+| ```ALTER ROUTINE```           | Alter_routine_priv           | Stored routines                       |
+| ```CREATE```                  | Create_priv                  | Databases, tables, or indexes         |
+| ```CREATE ROUTINE```          | Create_routine_priv          | Stored routines                       |
+| ```CREATE TEMPORARY TABLES``` | Create_tmp_table_priv        | Tables                                |
+| ```CREATE VIEW```             | Create_view_priv             | Views                                 |
+| ```DELETE```                  | Delete_priv                  | Tables                                |
+| ```DROP```                    | Drop_priv                    | Databases, tables, or views           |
+| ```EVENT```                   | Event_priv                   | Databases                             |
+| ```EXECUTE```                 | Execute_priv                 | Stored routines                       |
+| ```GRANT OPTION```            | Grant_priv                   | Databases, tables, or stored routines |
+| ```INDEX```                   | Index_priv                   | Tables                                |
+| ```INSERT```                  | Insert_priv                  | Tables or columns                     |
+| ```LOCK TABLES```             | Lock_tables_priv             | Databases                             |
+| ```REFERENCES```              | References_priv              | Databases or tables                   |
+| ```SELECT```                  | Select_priv                  | Tables or columns                     |
+| ```SHOW VIEW```               | Show_view_priv               | Views                                 |
+| ```TRIGGER```                 | Trigger_priv                 | Tables                                |
+| ```UPDATE```                  | Update_priv                  | Tables or columns                     |
+
+#### 동적 권한
+| Privilege                          | Context                                         |
+|------------------------------------|-------------------------------------------------|
+| ```APPLICATION_PASSWORD_ADMIN```   | Dual password administration                    |
+| ```AUDIT_ABORT_EXEMPT```           | Allow queries blocked by audit log filter       |
+| ```AUDIT_ADMIN```                  | Audit log administration                        |
+| ```AUTHENTICATION_POLICY_ADMIN```  | Authentication administration                   |
+| ```BACKUP_ADMIN```                 | Backup administration                           |
+| ```BINLOG_ADMIN```                 | Backup and Replication administration           |
+| ```BINLOG_ENCRYPTION_ADMIN```      | Backup and Replication administration           |
+| ```CLONE_ADMIN```                  | Clone administration                            |
+| ```CONNECTION_ADMIN```             | Server administration                           |
+| ```ENCRYPTION_KEY_ADMIN```         | Server administration                           |
+| ```FIREWALL_ADMIN```               | Firewall administration                         |
+| ```FIREWALL_EXEMPT```              | Firewall administration                         |
+| ```FIREWALL_USER```                | Firewall administration                         |
+| ```FLUSH_OPTIMIZER_COSTS```        | Server administration                           |
+| ```FLUSH_STATUS```                 | Server administration                           |
+| ```FLUSH_TABLES```                 | Server administration                           |
+| ```FLUSH_USER_RESOURCES```         | Server administration                           |
+| ```GROUP_REPLICATION_ADMIN```      | Replication administration                      |
+| ```GROUP_REPLICATION_STREAM```     | Replication administration                      |
+| ```INNODB_REDO_LOG_ARCHIVE```      | Redo log archiving administration               |
+| ```NDB_STORED_USER```              | NDB Cluster                                     |
+| ```PASSWORDLESS_USER_ADMIN```      | Authentication administration                   |
+| ```PERSIST_RO_VARIABLES_ADMIN```   | Server administration                           |
+| ```REPLICATION_APPLIER```          | PRIVILEGE_CHECKS_USER for a replication channel |
+| ```REPLICATION_SLAVE_ADMIN```      | Replication administration                      |
+| ```RESOURCE_GROUP_ADMIN```         | Resource group administration                   |
+| ```RESOURCE_GROUP_USER```          | Resource group administration                   |
+| ```ROLE_ADMIN```                   | Server administration                           |
+| ```SENSITIVE_VARIABLES_OBSERVER``` | Server administration                           |
+| ```SESSION_VARIABLES_ADMIN```      | Server administration                           |
+| ```SET_USER_ID```                  | Server administration                           |
+| ```SHOW_ROUTINE```                 | Server administration                           |
+| ```SYSTEM_USER```                  | Server administration                           |
+| ```SYSTEM_VARIABLES_ADMIN```       | Server administration                           |
+| ```TABLE_ENCRYPTION_ADMIN```       | Server administration                           |
+| ```VERSION_TOKEN_ADMIN```          | Server administration                           |
+| ```XA_RECOVER_ADMIN```             | Server administration                           |
