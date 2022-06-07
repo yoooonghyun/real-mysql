@@ -305,7 +305,79 @@ VIEW를 만들어서 VIEW에 대한 권한으로 관리
 
 ## 3.5 역할 (Role)
 
-MySQL 8.0부터 권한을 묶어서 Role로 사용
+### 역할 생성
+
+MySQL 8.0부터는 권한을 묶는 역할 (Role)을 지원.
+
+역할은 그 자체로는 사용될 수 없고, 계정에 부여되어야한다.
+
+#### ex. 3.5.1
+
+- 역할의 생성과 권한 부여
+
+```
+// 역할 생성
+mysql> Create ROLE
+    role_emp_read,
+    role_emp_write;
+
+// 권한 부여
+mysql> GRANT SELECT ON employees.* TO role_emp_read;
+mysql> GRANT INSERT, UPDATE, DELETE ON employees.* TO role_emp_write;
+
+// 계정 생성
+mysql> CREATE USER reader@'127.0.0.1' IDENTIFIED BY 'password';
+mysql> CREATE USER writer@'127.0.0.1' IDENTIFIED BY 'password';
+
+// 계정에 역할 부여
+mysql> GRANT role_emp_read TO reader@'127.0.0.1';
+mysql> GRANT role_emp_read, role_emp_write TO writer@'127.0.0.1';
+
+// reader계정의 권한 조회
+mysql> SHOW GRANTS;
+
+```
+| Grants for reader@%                      |
+|------------------------------------------|
+| GRANT USAGE ON *.* TO 'reader'@'%'       |
+| GRANT 'role_emp_read'@'%' TO 'reader'@'%'|
+
+### 역할 활성화
+
+기본적으로 역할은 로그인할 때마다 ```SET ROLE```을 통해 활성화해야 사용 가능
+
+activate_all_roles_on_login 시스템 변수를 통해 자동 활성화
+
+#### ex. 3.5.2
+
+- 역할의 활성화
+```
+// role_emp_read 역할 활성화
+mysql> SET ROLE 'role_emp_read';
+
+// 역할 자동 활성화
+mysql> SET GLOBAL active_all_roles_on_login=ON;
+```
+
+### 역할과 계정
+
+역할은 직무를 분리하기 위한 기능
+- user 테이블에 함께 저장
+- host: ```%```로 기록되어 있음.
+- account_lock: Y, 로그인 불가
+
+```
+mysql> SET user, host, account_locked FROM mysql.user;
+```
+
+| user           | host      | account_locked |
+|----------------|-----------|----------------|
+| role_emp_read  | %         | Y              |
+| role_emp_write | %         | Y              |
+| reader         | 127.0.01  | N              |
+| writer         | 127.0.0.1 | N              |
+| root           | localhost | N              |
+
 
 ## Apendix
 
