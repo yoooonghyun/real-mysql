@@ -1,3 +1,4 @@
+
 # 5. 트랜잭션과 잠금
 
 
@@ -124,8 +125,164 @@ DML(Data manipulation language)
 ### 5.2.2 테이블 락
 
 - 테이블 단위로 설정되는 잠금
+- 묵시적 / 명시적으로 테이블 락을 획득
+
+#### 잠금의 획득과 반환
+- 획득: ```LOCK TABLES table_name [ READ | WRITE ]```
+
+- 반환: ```UNLOCK TABLES```
+
+#### 묵시적 테이블 락
+- MyISAM / MEMORY의 경우 테이블에 데이터를 변경하는 쿼리 실행시 묵시적 테이블 잠금 동작
+- InnoDB는 스토리지 엔진 차원에서 레코드 기반 잠금을 제공하기 때문에 묵시적 테이블 잠금 동작 X
+- InnoDB의 스키마를 변경하는 DDL 쿼리의 경우 묵시적 테이블 락 동작
+
+### 5.2.3 네임드 락
+
+- 임의의 문자열에 대해 잠금을 설정.
+- 여러 서버의 동기화 처리에 사용
+
+#### ex. 5.2.1
+네임드 락의 사용 예시
+- 아래 3개의 함수 모두 성공 시 1 / 실패시 0 or NULL 반환.
+```
+// mylock에 대해 잠금 획득
+// 이미 잠금을 사용 중이면 2초간 대기
+mysql> SELECT GET_LOCK('mylock', 2);
+
+// mylock이라는 문자열에 대해 잠금이 설정돼 있는지 확인.
+mysql> SELECT IS_FREE_LOCK('mylock');
+
+// mylock에 대해 잠금 해제
+mysql> SELECT RELEASE_LOCK('mylock');
+
+// 모든 테이블 락에 대해 잠금 해제
+mysql> SELECT RELEASE_ALL_LOCKS();
+```
+
+### 5.2.4 메타데이터 락
+
+- 데이터베이스 객체의 이름이나 구조를 변경하는 경우 획득하는 잠금.
+- 명시적으로 획득 / 해제 불가.
+
+#### ex. 5.2.2
+메타데이터 락 사용 예시
+```
+// 메타데이터 락을 통해 변경
+mysql> RENAME TABLE tb TO tb_backup , tb_new TO tb;
+
+// 짧은 순간 tb 테이블이 없는 순간 발생
+mysql> RENAME TABLE tb TO tb_backup;
+mysql> RENAME TABLE tb_new TO tb;
+```
+## 5.3 InnoDB 스토리지 엔진 잠금
+
+- InnoDB 스토리지 엔진은 별도의 레코드 기반의 잠금 방식 제공.
+- 이원화된 잠금 처리로 MySQL 명령을 통해 접근하기 어려움.
+- infomation_schecma의 INNODB_TRX / INNODB_LOCKS, INNODB_LOCK_WAITS 테이블을 통해 조회.
+
+### 5.3.1 InnoDB 스토리지 엔진의 잠금
+![innodb_lock](images/innodb_lock.png)
+
+#### 5.3.1.1 레코드 락
+
+- 수정, 삽입, 삭제등의 다른 트랜잭션을 막는다.
+- InnoDB 스토리지 엔진은 인덱스의 레코드를 잠금.
+- 인덱스가 없는 테이블이더라도 자동 생성된 클러스터 인덱스를 통해 잠금 설정.
+- 기본키나 유니크 키에 의한 변경 작업은 갭 락 없이 인덱스 레코드에만 락을 건다.
+
+#### ex. 5.3.1
+```
+// c1=10인 인덱스 레코드에 락
+// 수정, 삽입, 삭제 불가
+SELECT c1 FROM t WHERE c1=10 FOR UPDATE;
+```
+
+#### 5.3.1.2 갭 락
+
+- 레코드와 바로 인점한 레코드 사이의 간격만을 잠금
+- 레코드와 레코드 사이에 새로운 레코드가 INSERT되는 것을 제어
+- 넥스트 키 락의 일부로 사용
+
+#### 5.3.1.3 넥스트 키 락
+
+- 레코드 락과 갭 락을 합쳐놓은 형태의 잠금
+- 인덱스 레코드도 잠그고 그 인덱스 레코드 앞, 뒤 갭도 잠근다.
+
+#### ex. 5.3.2
+```
+// c1=15 인 레코드를 insert 하는 트랜잭션을 락 (레코드 락)
+// c1=8인 레코드 인덱스가 있는 상태라면, c1=9인 레코드를 insert 락 (갭 락)
+SELECT c1 FROM t WHERE c1 BETWEEN 10 AND 20 FOR UPDATE;
+```
+
+#### 5.3.1.4 자동 증가 락
+
+- AUTO_INCREMENT 컬럼이 사용되는 테이블에서 레코드가 INSERT 되는 경우 사용
+- 명시적으로 획득 / 해제 불가
+- innodb_autoinc_lock_mode 시스템 변수를 통해서 작동 방식 변경
+
+#### reference: https://dev.mysql.com/doc/refman/5.7/en/innodb-auto-increment-handling.html
+
+### 5.3.2 인덱스와 잠금
+
+- InnoDB의 잠금은 인덱스의 레코드를 잠금
+- UPDATE시에 변경할 레코드를 찾기 위해 검색한 인덱스의 레코드에 모두 락을 걸어야함
+- 인덱스가 없다면 모든 레코드에 잠금 (풀스캔)
+
+### 5.3.3 레코드 수준의 잠금 확인 및 해제
+
+InnoDB 스토리지 엔진을...
+
+## 5.4 MySQL의 격리 수준
+
+| 격리 수준       |DIRTY READ	|NON-REPEATABLE READ|PHANTOM READ       |
+|----------------|-------------|--------------------|------------------|
+|READ UNCOMMITTED|O            |O               	|O                 |
+|READ COMMITTED	 |	           |O                 	|O                 | 
+|REPEATABLE READ | 	 	       |                    |O (InnoDB는 발생 X)|
+|SERIALIZABLE	 |	           |                    |                  |
 
 
-획득: ```LOCK TABLES table_name [ READ | WRITE ]```
+## Read Uncommited
+- 각 트랜잭션에서의 변경 내용이 COMMIT이나 ROLLBACK 여부에 상관 없이 다른 트랜잭션에서 보여지는 격리 수준
+- 작업 도중 문제가 발생하여 INSERT된 내용을 롤백해버린다 하더라도 다른 사용자는 롤백된 정보를 이용하여 처리
 
-반환: ```UNLOCK TABLES```
+![read_uncommited](images/read_uncommited.png)
+
+### Dirty Read
+- 트랜잭션에서 처리한 작업이 완료되지 않았음에도 불구하고 다른 트랜잭션에서 볼 수 있게 되는 현상
+
+
+## Read Commited
+- 서비스에서 가장 많이 선택되는 격리 수준입니다.
+- 어떠한 트랜잭션에서 데이터를 변경하더라도 COMMIT이 완료된 데이터만 다른 트랜잭션에서 조회
+- Commit 전의 데이터는 UNDO 영역에서 조회
+
+![read_commited](images/read_commited.png)
+
+### Non-Repeatable Read
+- 동일한 SELECT 쿼리를 실행했을 때 항상 같은 결과를 보장해야 한다는 "REPEATABLE READ" 정합성에 어긋나는 현상
+
+![non_repeatable_read](images/non_repeatable_read.png)
+
+### Repeatable Read
+- MySQL의 InnoDB 스토리지 엔진에서 기본적으로 사용되는 격리 수준
+- NON-REPEATABLE READ 부정합이 발생 X
+- 언두 영역에 백업된 이전 데이터를 통해 동일한 트랜잭션 내에서는 동일한 결과 보장
+- MVCC(Multi Version Concurrency Control)를 보장하기 위해 실행중인 트랜잭션 가운데 가장 오래된 트랜잭션 번호보다 트랜잭션 번호가 앞선 언두 영역의 데이터는 삭제 X
+
+![repeatable_read](images/repeatable_read.png)
+
+### Phantom Read
+- 다른 트랜잭션에서 수행한 변경 작업에 의해 레코드가 보였다가 안보였다가 하는 현상
+- InnoDB는 MVCC를 통해 Repeatable Read에서도 Phantom Read 발생 X
+
+![phantom_read](images/phantom_read.png)
+
+
+### Serializable
+
+- 가장 단순한 격리 수준이면서 가장 엄격한 격리 수준
+- 한 트랜잭션에서 읽고 쓰는 레코드를 다른 트랜잭션에서는 절대 접근 X
+
