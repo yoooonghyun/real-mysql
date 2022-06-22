@@ -255,30 +255,30 @@ performance_schema
 |SERIALIZABLE	 |	           |                    |                  |
 
 
-### Read Uncommited
+## Read Uncommited
 - 각 트랜잭션에서의 변경 내용이 COMMIT이나 ROLLBACK 여부에 상관 없이 다른 트랜잭션에서 보여지는 격리 수준.
 - 작업 도중 문제가 발생하여 INSERT된 내용을 롤백해버린다 하더라도 다른 사용자는 롤백된 정보를 이용하여 처리.
 - 일반적으로 사용 X.
 
 ![read_uncommited](images/read_uncommited.png)
 
-### Dirty Read
+## Dirty Read
 - 트랜잭션에서 처리한 작업이 완료되지 않았음에도 불구하고 다른 트랜잭션에서 볼 수 있게 되는 현상.
 
 
-### Read Commited
+## Read Commited
 - 서비스에서 가장 많이 선택되는 격리 수준.
 - 어떠한 트랜잭션에서 데이터를 변경하더라도 COMMIT이 완료된 데이터만 다른 트랜잭션에서 조회.
 - Commit 전의 데이터는 UNDO 영역에서 조회.
 
 ![read_commited](images/read_commited.png)
 
-### Non-Repeatable Read
+## Non-Repeatable Read
 - 동일한 SELECT 쿼리를 실행했을 때 항상 같은 결과를 보장해야 한다는 "REPEATABLE READ" 정합성에 어긋나는 현상.
 
 ![non_repeatable_read](images/non_repeatable_read.png)
 
-### Repeatable Read
+## Repeatable Read
 - MySQL의 InnoDB 스토리지 엔진에서 기본적으로 사용되는 격리 수준.
 - NON-REPEATABLE READ 부정합이 발생 X.
 - 언두 영역에 백업된 이전 데이터를 통해 동일한 트랜잭션 내에서는 동일한 결과 보장.
@@ -286,14 +286,14 @@ performance_schema
 
 ![repeatable_read](images/repeatable_read.png)
 
-### Phantom Read
+## Phantom Read
 - 다른 트랜잭션에서 수행한 변경 작업에 의해 레코드가 보였다가 안보였다가 하는 현상.
 - InnoDB는 MVCC를 통해 Repeatable Read에서도 Phantom Read 발생 X.
 
 ![phantom_read](images/phantom_read.png)
 
 
-### Serializable
+## Serializable
 
 - 가장 단순한 격리 수준이면서 가장 엄격한 격리 수준.
 - 한 트랜잭션에서 읽고 쓰는 레코드를 다른 트랜잭션에서는 절대 접근 X.
