@@ -182,7 +182,7 @@ mysql> RENAME TABLE tb_new TO tb;
 - infomation_schecma의 INNODB_TRX / INNODB_LOCKS, INNODB_LOCK_WAITS 테이블을 통해 조회.
 
 ### 5.3.1 InnoDB 스토리지 엔진의 잠금
-![innodb_lock](images/innodb_lock.png)
+![innodb_lock](images/innodb_lock.PNG)
 
 #### 5.3.1.1 레코드 락
 
