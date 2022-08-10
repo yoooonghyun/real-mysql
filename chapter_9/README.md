@@ -572,7 +572,7 @@ mysql> SELECT *
     );
 ```
 - employees에 대한 조건이 subquery 외에는 없음.
-- 세미 조인에 사용된 서브쿼리를 통째로 구체화해서 쿼리를 최적화.
+- 세미 조인에 사용된 서브쿼리를 임시테이블 형태로 구체화한 후 조인을 수행하여 쿼리를 최적화.
 - 서브쿼리 내에 GROUP BY가 있어도 사용 가능한 전략.
 - 실행 계획의 select_type에 ```MATERIALIZED``` 노출
 
@@ -591,6 +591,7 @@ mysql> SELECT *
         WHERE s.salary > 150000
     );
 ```
+- 서브쿼리에서 중복된 레코드가 발생하는 경우의 최적화.
 - 세미 조인 서브쿼리를 일반적인 INNER JOIN 쿼리로 바꿔서 실행 후, 마지막에 중복 레코드를 제거
 - 실행 계획의 Extra 칼럼에 ```Start temporary```와 ```End temporary``` 출력 (처리 중 임시테이블 생성)
 - 실제 내부 동작은 아래 GROUP BY로 실행하는 것과 같이 동작
@@ -608,7 +609,8 @@ mysql> SELECT e.*
 - 서브쿼리의 테이블을 조인으로 처리하기 때문에 최적화할 수 있는 방법이 많음.
 
 #### 9.3.1.15 컨디셔녀 팬아웃(condition_fanout_filter)
-- 쿼리 실행을 수립하는 과정에서 검색한 레코드 중 얼마나 걸러질 지 예측. (쿼리 실행 계획의 filtered 컬럼)
+- 검색한 레코드는 WHERE절에 의해 일부만 사용될 수 있음.
+- 쿼리 실행을 수립하는 과정에서 검색한 레코드 결과 중 얼마나 걸러질 지 예측. (쿼리 실행 계획의 filtered 컬럼에 표시)
 - WHERE절에 사용한 컬럼의 인덱스 / 히스토그램으로부터 예측.
 - 더 빠른 실행계획을 만들어낼 수 있으나, 실행 계획 수립에 추가 오버헤드 발생.
 
@@ -655,6 +657,7 @@ mysql> SELECT  *
 mysql> SELECT * FROM employees WHERE birth_date >= '1965-02-01';
 ```
 - 선행 인덱스가 조건절에 포함되어 있지 않더라도 인덱스 사용 가능.
+- gender = M, gender = W에 대해서 모두 조회하듯이 동작.
 - 조건절에 포함되지 않은 인덱스가 소수의 유니크한 값을 가질 때만 실행
 
 #### 9.3.1.19 해시 조인(hash_join)
@@ -668,7 +671,7 @@ mysql> SELECT * FROM employees WHERE birth_date >= '1965-02-01';
 - 해시 조인을 사용한 쿼리는 최고 스루풋 전략에 적합하며, NL조인은 최고 응답 속도 전략에 적합.
 
 #### 해시 조인의 사용
-- 해시 조인은 NL 조인의 차선책 (조인 컬럼의 인덱스 X / 조인 새상 테이블 중 일부의 레코드가 매우 적음)
+- 해시 조인은 NL 조인의 차선책 (조인 컬럼의 인덱스 X / 조인 대상 테이블 중 일부의 레코드가 매우 적음)
 - 8.0.20 버전부터는 블락 네스티드 루프 조인을 사용하는 경우를 해시 조인으로 대체
 
 #### ex. 9.3.3
@@ -802,7 +805,7 @@ mysql> SELECT * FROM employees USE INDEX(ix_firstname) WHERE emp_no = 10001;
 ```
 - 안쓰는걸 권장.
 - 통계정보가 변할 수 있음.
-- 데이터와 모델을 간소화하고 쿼리를 간결하게 만들도록 해야함.
+- 인덱스 관련 힌트를 안쓰도록 데이터와 모델을 간소화하고 쿼리를 간결하게 만들도록 해야함.
 
 #### 9.4.1.3 SQL_CALC_FOUND_ROWS
 ```
@@ -976,3 +979,30 @@ mysql> SELECT /*+ NO_SKIP_SCAN(employees ix_gender_birthday) */ *
 |IGNORE INDEX             |NO_INDEX      |
 |IGNORE INDEX FOR GROUP BY|NO_GROUP_INDEX|
 |IGNORE INDEX FOR ORDER BY|NO_ORDER_INDEX|
+
+## Apendix
+
+### A. 상관 서브쿼리
+
+- 외부 쿼리의 컬럼 중에 하나가 서브쿼리의 조건에 이용되는 경우
+
+```
+SELECT deptno, ename, sal
+FROM emp e1
+WHERE sal = (SELECT MAX(sal) FROM emp e2 WHERE e1.deptno = e2.deptno)
+ORDER BY deptno;
+```
+
+### B. 히스토그램
+- 컬럼 단위로 수집되고 관리
+- 수집 명령어를 통해 수집
+```
+// 히스토그램 수집
+mysql> ANALYZE TABLE employees
+UPDATE HISTOGRAM ON gender,hire_date;
+
+// 통계정보 확인
+mysql> SELECT *
+FROM information_schema.COLUMN_STATISTICS
+WHERE table_name='employees'\G
+```
